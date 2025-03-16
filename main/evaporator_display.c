@@ -1,5 +1,7 @@
 #include "evaporator_display.h"
 
+static const char *TAG = "Evaporator display";
+
 static displayData data = {
     .water=true,
     .tasty=true,
@@ -68,14 +70,15 @@ static void refreshData(void* arg) {
         data.celsius = rand() % 2;
         data.persent = rand() % 2;
         // gnd5
-        data.auto_text = rand() % 2;
-        data.auto_1 = rand() % 2;
-        data.auto_2 = rand() % 2;
+        int tmp = rand() % 5;
+        data.auto_text = true;
+        data.auto_1 = (tmp > 0) ? true : false;
+        data.auto_2 = (tmp > 1) ? true : false;
         // gnd6
-        data.auto_3 = rand() % 2;
-        data.auto_4 = rand() % 2;
+        data.auto_3 = (tmp > 2) ? true : false;
+        data.auto_4 = (tmp > 3) ? true : false;
 
-        printf("CHANGE DATA = %d\n", data.big_num);
+        ESP_LOGI(TAG, "CHANGE DATA = %d", data.big_num);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
@@ -167,14 +170,11 @@ static void refreshPinsData(){
                                 false,
                                 false,
                                 false};
-
-    printf("REFRESH PINS\n");
 }
 
 
 static void displayShows(int gnd_num, pinsData pins_data) {
-    // отключение всех gnd
-    offGndPins();
+
     // зануление gnd
     gpio_set_level(gnd_num, 0);
     // выставление напряжения на пинах
@@ -187,23 +187,23 @@ static void displayShows(int gnd_num, pinsData pins_data) {
     gpio_set_level(DISP_7, pins_data.pin7);
     gpio_set_level(DISP_8, pins_data.pin8);
     gpio_set_level(DISP_9, pins_data.pin9);
-
+    // период обновления экрана 1мс
     vTaskDelay(1 / portTICK_PERIOD_MS);
+    // отключение всех gnd
+    offGndPins();
 }
-
-
 
 
 //нужно будет обновлять по прерываниям, наверное
 static void displayRefreshTask(void* arg) {
     while(1) {
         refreshPinsData();
-        for(int i = 0; i < 100/4; i++) {
+        for(int i = 0; i < 100/6; i++) {
             displayShows(GND_1, pins_data_gnd1);
             displayShows(GND_2, pins_data_gnd2);
             displayShows(GND_3, pins_data_gnd3);
             displayShows(GND_4, pins_data_gnd4);
-            displayShows(GND_5, pins_data_gnd6);
+            displayShows(GND_5, pins_data_gnd5);
             displayShows(GND_6, pins_data_gnd6);
         }
         vTaskDelay(1);
@@ -236,5 +236,5 @@ void initDisplay() {
 
 
     xTaskCreatePinnedToCore(displayRefreshTask, "refresh_display_task", 4096, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(refreshData, "refreshData", 4096, NULL, 2, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(refreshData, "refreshData", 1024, NULL, 2, NULL, tskNO_AFFINITY);
 }

@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "esp_timer.h"
+#include "esp_log.h"
 
 #define GND_1 GPIO_NUM_13
 #define GND_2 GPIO_NUM_12
