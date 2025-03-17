@@ -1,6 +1,7 @@
 #include "evaporator_display.h"
 
 static const char *TAG = "Evaporator display";
+static QueueHandle_t timer_queue = NULL;
 
 static displayData data = {
     .water=true,
@@ -174,7 +175,6 @@ static void refreshPinsData(){
 
 
 static void displayShows(int gnd_num, pinsData pins_data) {
-
     // зануление gnd
     gpio_set_level(gnd_num, 0);
     // выставление напряжения на пинах
@@ -187,18 +187,21 @@ static void displayShows(int gnd_num, pinsData pins_data) {
     gpio_set_level(DISP_7, pins_data.pin7);
     gpio_set_level(DISP_8, pins_data.pin8);
     gpio_set_level(DISP_9, pins_data.pin9);
-    // период обновления экрана 1мс
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    // период обновления экрана 1/6мс
+    bool alarm;
+    if(xQueueReceive(timer_queue, &alarm, 10)) {
+    }
     // отключение всех gnd
-    offGndPins();
+        offGndPins();
 }
 
 
-//нужно будет обновлять по прерываниям, наверное
+// обновление данных экрана 10 кадров в секунду
 static void displayRefreshTask(void* arg) {
     while(1) {
         refreshPinsData();
-        for(int i = 0; i < 100/6; i++) {
+        // цикл for выполняется за 100мс
+        for(int i = 0; i < 100; i++) {
             displayShows(GND_1, pins_data_gnd1);
             displayShows(GND_2, pins_data_gnd2);
             displayShows(GND_3, pins_data_gnd3);
@@ -206,13 +209,53 @@ static void displayRefreshTask(void* arg) {
             displayShows(GND_5, pins_data_gnd5);
             displayShows(GND_6, pins_data_gnd6);
         }
-        vTaskDelay(1);
+        ESP_LOGI(TAG, "refresh");
     }
 
     vTaskDelete(NULL);
 }
 
+// Обработчик прерывания по таймеру
+static bool IRAM_ATTR timer_isr_callback(gptimer_handle_t timer, const gptimer_alarm_event_data_t *edata, void *user_data)
+{
+    bool alarm = true;
+    xQueueSendFromISR(timer_queue, &alarm, NULL);
+    return true;
+}
 
+// Инициализация таймера
+void initTimer() {
+    timer_queue = xQueueCreate(10, sizeof(bool));
+    // Настраиваем параметры таймера
+    gptimer_handle_t gptimer = NULL;
+    gptimer_config_t timer_config = {
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT,            // Выбираем источник тактового сигнала для счетчиков
+        .direction = GPTIMER_COUNT_UP,                 // Устанавливаем направление счета
+        .resolution_hz = 600000, // 600kHz  // Устанавливаем частоту счета, то есть минимальный интервал времени на 1 тик
+    };
+    gptimer_new_timer(&timer_config, &gptimer);
+
+    // Подключаем функцию обратного вызова
+    gptimer_event_callbacks_t cb_config = {
+        .on_alarm = timer_isr_callback,
+    };
+    gptimer_register_event_callbacks(gptimer, &cb_config, NULL);
+
+    // Задаем параметры счетчика таймера
+    gptimer_alarm_config_t alarm_config = {
+        .alarm_count = 100,                        // Конечное значение счетчика = 1/6мс
+        .reload_count = 0,                          // Значение счетчика при автосбросе
+        .flags.auto_reload_on_alarm = true,         // Автоперезапуск счетчика таймера разрешен
+    };
+    gptimer_set_alarm_action(gptimer, &alarm_config);
+
+    // Разрешаем прерывания для данного таймера
+    gptimer_enable(gptimer);
+
+    // Запускаем таймер
+    gptimer_start(gptimer);
+    ESP_LOGI("main", "Hardware timer stated");
+}
 
 void initDisplay() {
     initGndPin(GND_1);
@@ -233,8 +276,9 @@ void initDisplay() {
     initDispPin(DISP_9);
 
     refreshPinsData();
+    initTimer();
 
 
     xTaskCreatePinnedToCore(displayRefreshTask, "refresh_display_task", 4096, NULL, 10, NULL, 1);
-    xTaskCreatePinnedToCore(refreshData, "refreshData", 1024, NULL, 2, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(refreshData, "refreshData", 4096, NULL, 2, NULL, tskNO_AFFINITY);
 }
