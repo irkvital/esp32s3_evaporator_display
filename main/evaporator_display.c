@@ -88,7 +88,7 @@ static void refreshDataHumi(void* arg) {
     while(1) {
         int number = getDataFromHomeAssistant();
         data.big_num = number;
-        ESP_LOGI(TAG, "Humi set = %d", number);
+        // ESP_LOGI(TAG, "Humi set = %d", number);
         vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
@@ -294,13 +294,11 @@ int getDataFromHomeAssistant() {
         // Выполняем запрос
         esp_http_client_perform(client);
         int response = esp_http_client_get_status_code(client);
-        int len_response = esp_http_client_get_content_length(client);
-        char* data = malloc(len_response * sizeof(char));
-        esp_http_client_open(client, len_response);
-        int len_read = esp_http_client_read_response(client, data, len_response);
+        char data[100];
+        esp_http_client_open(client, 100);
+        int len_read = esp_http_client_read_response(client, data, 100);
         esp_http_client_close(client);
 
-        ESP_LOGD(TAG, "LEN RESPONsE = %d", len_read);
         ESP_LOGD(TAG, "esp_http_client_get_status_code = %d", response);
         ESP_LOGD(TAG, "response data = %s", data);
         // Считаем значение влажности
@@ -308,7 +306,6 @@ int getDataFromHomeAssistant() {
         humi = strtol(tmp + 9, NULL, 10);
         // Освободим ресурсы
         esp_http_client_cleanup(client);
-        free(data);
     };
 
     return humi;
