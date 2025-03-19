@@ -7,6 +7,7 @@
 #include "driver/gpio.h"
 #include "driver/gptimer.h"
 #include "esp_log.h"
+#include "esp_http_client.h"
 
 #define GND_1 GPIO_NUM_13
 #define GND_2 GPIO_NUM_12
@@ -60,5 +61,6 @@ typedef struct {
 
 
 void initDisplay();
+int getDataFromHomeAssistant();
 
 #endif 

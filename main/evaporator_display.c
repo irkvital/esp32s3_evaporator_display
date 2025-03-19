@@ -209,7 +209,6 @@ static void displayRefreshTask(void* arg) {
             displayShows(GND_5, pins_data_gnd5);
             displayShows(GND_6, pins_data_gnd6);
         }
-        ESP_LOGI(TAG, "refresh");
     }
 
     vTaskDelete(NULL);
@@ -255,6 +254,34 @@ void initTimer() {
     // Запускаем таймер
     gptimer_start(gptimer);
     ESP_LOGI("main", "Hardware timer stated");
+}
+
+// HTTP запрос от home assistant
+int getDataFromHomeAssistant() {
+    // Параметры конфигурации HTTP-соединения
+    esp_http_client_config_t request;
+    memset(&request, 0, sizeof(request));
+    // Параметры HTTP-соединения
+    request.host = "http://stroika53.ru/sample-page/";
+    request.port = 80;
+    request.path = "/get";
+    request.user_agent = "ESP32";
+    // Формируем запрос
+    request.query = "cid=2468&key=H9xOdR&p1=1&p2=test&p3=12.85";
+    // Транспорт TCP/IP
+    request.transport_type = HTTP_TRANSPORT_OVER_TCP;
+    // Запрос типа GET
+    request.method = HTTP_METHOD_GET;
+    // Блокировка задачи на время выполнения обмена с сервером
+    request.is_async = false;
+    // Не обязательные параметры, их можно не заполнять
+    request.keep_alive_enable = false; 
+    request.timeout_ms = 60000;
+    request.disable_auto_redirect = false;
+    request.max_redirection_count = 0;
+
+
+    return 0;
 }
 
 void initDisplay() {

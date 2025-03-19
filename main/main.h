@@ -5,5 +5,6 @@
 #include "esp_timer.h"
 #include "driver/gpio.h"
 #include "evaporator_display.h"
+#include "wifi.h"
 
 #endif
