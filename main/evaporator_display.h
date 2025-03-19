@@ -26,6 +26,9 @@
 #define DISP_8 GPIO_NUM_6
 #define DISP_9 GPIO_NUM_5
 
+#define BEARER "Bearer "
+#define HOME_ASSISTANT_TOKEN BEARER CONFIG_HOME_ASSISTANT_TOKEN
+
 #define DISP_FPS 10
 
 

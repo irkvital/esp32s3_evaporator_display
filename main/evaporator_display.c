@@ -60,12 +60,12 @@ static void refreshData(void* arg) {
         data.water = rand() % 2;
         data.tasty = rand() % 2;
         data.ion = rand() % 2;
-        data.wifi = rand() % 2;
+        // data.wifi = rand() % 2;
         data.timer = rand() % 2;
         // gnd2
         data.small_num = rand() % 20;
         // gnd3
-        data.big_num = rand() % 100;
+        // data.big_num = rand() % 100;
         data.h = rand() % 2;
         // gnd4
         data.celsius = rand() % 2;
@@ -79,8 +79,17 @@ static void refreshData(void* arg) {
         data.auto_3 = (tmp > 2) ? true : false;
         data.auto_4 = (tmp > 3) ? true : false;
 
-        ESP_LOGI(TAG, "CHANGE DATA = %d", data.big_num);
+        ESP_LOGD(TAG, "CHANGE DATA = %d", data.big_num);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+static void refreshDataHumi(void* arg) {
+    while(1) {
+        int number = getDataFromHomeAssistant();
+        data.big_num = number;
+        ESP_LOGI(TAG, "Humi set = %d", number);
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -261,27 +270,48 @@ int getDataFromHomeAssistant() {
     // Параметры конфигурации HTTP-соединения
     esp_http_client_config_t request;
     memset(&request, 0, sizeof(request));
-    // Параметры HTTP-соединения
-    request.host = "http://stroika53.ru/sample-page/";
-    request.port = 80;
-    request.path = "/get";
-    request.user_agent = "ESP32";
-    // Формируем запрос
-    request.query = "cid=2468&key=H9xOdR&p1=1&p2=test&p3=12.85";
+    // Начальный URI
+    request.url = "http://192.168.0.249:8123/api/states/sensor.qingping_cgs1_humidity";
     // Транспорт TCP/IP
     request.transport_type = HTTP_TRANSPORT_OVER_TCP;
     // Запрос типа GET
     request.method = HTTP_METHOD_GET;
     // Блокировка задачи на время выполнения обмена с сервером
     request.is_async = false;
-    // Не обязательные параметры, их можно не заполнять
-    request.keep_alive_enable = false; 
+    // Закрыть соединение сразу после отправки всех данных
+    request.keep_alive_enable = false;
+    // Таймаут передачи
     request.timeout_ms = 60000;
+    // Разрешить автоматическую переадресацию без ограничений
     request.disable_auto_redirect = false;
     request.max_redirection_count = 0;
 
+    esp_http_client_handle_t client = esp_http_client_init(&request);
+    esp_http_client_set_header(client, "Authorization", HOME_ASSISTANT_TOKEN);
 
-    return 0;
+    int humi = -1;
+    if (client) {
+        // Выполняем запрос
+        esp_http_client_perform(client);
+        int response = esp_http_client_get_status_code(client);
+        int len_response = esp_http_client_get_content_length(client);
+        char* data = malloc(len_response * sizeof(char));
+        esp_http_client_open(client, len_response);
+        int len_read = esp_http_client_read_response(client, data, len_response);
+        esp_http_client_close(client);
+
+        ESP_LOGD(TAG, "LEN RESPONsE = %d", len_read);
+        ESP_LOGD(TAG, "esp_http_client_get_status_code = %d", response);
+        ESP_LOGD(TAG, "response data = %s", data);
+        // Считаем значение влажности
+        char* tmp = strstr(data, "\"state\":");
+        humi = strtol(tmp + 9, NULL, 10);
+        // Освободим ресурсы
+        esp_http_client_cleanup(client);
+        free(data);
+    };
+
+    return humi;
 }
 
 void initDisplay() {
@@ -305,7 +335,7 @@ void initDisplay() {
     refreshPinsData();
     initTimer();
 
-
     xTaskCreatePinnedToCore(displayRefreshTask, "refresh_display_task", 4096, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(refreshData, "refreshData", 4096, NULL, 2, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(refreshDataHumi, "refreshDataHumi", 4096, NULL, 2, NULL, tskNO_AFFINITY);
 }

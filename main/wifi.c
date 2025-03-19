@@ -9,23 +9,6 @@
 
 #include "wifi.h"
 
-#define GND_1 GPIO_NUM_13
-#define GND_2 GPIO_NUM_12
-#define GND_3 GPIO_NUM_11
-#define GND_4 GPIO_NUM_10
-#define GND_5 GPIO_NUM_9
-#define GND_6 GPIO_NUM_4
-
-#define DISP_1 GPIO_NUM_3
-#define DISP_2 GPIO_NUM_8
-#define DISP_3 GPIO_NUM_18
-#define DISP_4 GPIO_NUM_17
-#define DISP_5 GPIO_NUM_16
-#define DISP_6 GPIO_NUM_15
-#define DISP_7 GPIO_NUM_7
-#define DISP_8 GPIO_NUM_6
-#define DISP_9 GPIO_NUM_5
-
 /* The examples use WiFi configuration that you can set via project configuration menu
 
    If you'd rather not, just change the below entries to strings with
