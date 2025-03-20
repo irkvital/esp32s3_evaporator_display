@@ -85,11 +85,17 @@ static void refreshData(void* arg) {
 }
 
 static void refreshDataHumi(void* arg) {
+    TickType_t prew = xTaskGetTickCount();
     while(1) {
         int number = getDataFromHomeAssistant();
-        data.big_num = number;
+        if (number == -1) {
+            data.wifi = false;
+        } else {
+            data.wifi = true;
+            data.big_num = number;
+        }
         // ESP_LOGI(TAG, "Humi set = %d", number);
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+        vTaskDelayUntil(&prew, 10000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -184,6 +190,8 @@ static void refreshPinsData(){
 
 
 static void displayShows(int gnd_num, pinsData pins_data) {
+    // отключение всех gnd
+    offGndPins();
     // зануление gnd
     gpio_set_level(gnd_num, 0);
     // выставление напряжения на пинах
@@ -200,8 +208,6 @@ static void displayShows(int gnd_num, pinsData pins_data) {
     bool alarm;
     if(xQueueReceive(timer_queue, &alarm, 10)) {
     }
-    // отключение всех gnd
-        offGndPins();
 }
 
 
@@ -281,7 +287,7 @@ int getDataFromHomeAssistant() {
     // Закрыть соединение сразу после отправки всех данных
     request.keep_alive_enable = false;
     // Таймаут передачи
-    request.timeout_ms = 60000;
+    request.timeout_ms = 5000;
     // Разрешить автоматическую переадресацию без ограничений
     request.disable_auto_redirect = false;
     request.max_redirection_count = 0;
@@ -294,20 +300,24 @@ int getDataFromHomeAssistant() {
         // Выполняем запрос
         esp_http_client_perform(client);
         int response = esp_http_client_get_status_code(client);
-        char data[100];
-        esp_http_client_open(client, 100);
-        int len_read = esp_http_client_read_response(client, data, 100);
-        esp_http_client_close(client);
+        char response_data[100];
+        if (response == 200) {
+            esp_http_client_open(client, 100);
+            int len_read = esp_http_client_read_response(client, response_data, 100);
+            esp_http_client_close(client);
 
-        ESP_LOGD(TAG, "esp_http_client_get_status_code = %d", response);
-        ESP_LOGD(TAG, "response data = %s", data);
-        // Считаем значение влажности
-        char* tmp = strstr(data, "\"state\":");
-        humi = strtol(tmp + 9, NULL, 10);
+            ESP_LOGI(TAG, "esp_http_client_get_status_code = %d", response);
+            ESP_LOGD(TAG, "response data = %s", response_data);
+            // Считаем значение влажности
+            char* tmp = strstr(response_data, "\"state\":");
+            humi = strtol(tmp + 9, NULL, 10);
+            data.wifi = true;
+        } else {
+            ESP_LOGI(TAG, "NO INTERNET");
+        };
         // Освободим ресурсы
         esp_http_client_cleanup(client);
-    };
-
+    }
     return humi;
 }
 
@@ -334,5 +344,5 @@ void initDisplay() {
 
     xTaskCreatePinnedToCore(displayRefreshTask, "refresh_display_task", 4096, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(refreshData, "refreshData", 4096, NULL, 2, NULL, tskNO_AFFINITY);
-    xTaskCreatePinnedToCore(refreshDataHumi, "refreshDataHumi", 4096, NULL, 2, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(refreshDataHumi, "refreshDataHumi", 4096, NULL, 2, NULL, 1);
 }
