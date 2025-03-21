@@ -84,23 +84,6 @@ static void refreshData(void* arg) {
     }
 }
 
-static void refreshDataHumi(void* arg) {
-    TickType_t prew = xTaskGetTickCount();
-    while(1) {
-        int number = getDataFromHomeAssistant();
-        if (number == -1) {
-            data.wifi = false;
-        } else {
-            data.wifi = true;
-            data.big_num = number;
-        }
-        // ESP_LOGI(TAG, "Humi set = %d", number);
-        vTaskDelayUntil(&prew, 10000 / portTICK_PERIOD_MS);
-    }
-}
-
-
-
 // входной параметр - цифра (от 0 до 9), на выходе 
 // структура с 7 сигналами для отрисовки цифры и двумя сигналами pin8 и pin9 в конце
 static pinsData getNumberPins(uint8_t num, bool pin8, bool pin9) {
@@ -272,12 +255,13 @@ void initTimer() {
 }
 
 // HTTP запрос от home assistant
-int getDataFromHomeAssistant() {
+static void refreshDataHumi(void* arg) {
+    char* url = "http://192.168.0.249:8123/api/states/sensor.qingping_cgs1_humidity";
     // Параметры конфигурации HTTP-соединения
     esp_http_client_config_t request;
     memset(&request, 0, sizeof(request));
     // Начальный URI
-    request.url = "http://192.168.0.249:8123/api/states/sensor.qingping_cgs1_humidity";
+    request.url = url;
     // Транспорт TCP/IP
     request.transport_type = HTTP_TRANSPORT_OVER_TCP;
     // Запрос типа GET
@@ -294,31 +278,41 @@ int getDataFromHomeAssistant() {
 
     esp_http_client_handle_t client = esp_http_client_init(&request);
     esp_http_client_set_header(client, "Authorization", HOME_ASSISTANT_TOKEN);
-
+    int len_data = 500;
+    char response_data[len_data];
     int humi = -1;
-    if (client) {
-        // Выполняем запрос
-        esp_http_client_perform(client);
-        int response = esp_http_client_get_status_code(client);
-        char response_data[100];
-        if (response == 200) {
-            esp_http_client_open(client, 100);
-            int len_read = esp_http_client_read_response(client, response_data, 100);
-            esp_http_client_close(client);
 
-            ESP_LOGI(TAG, "esp_http_client_get_status_code = %d", response);
-            ESP_LOGD(TAG, "response data = %s", response_data);
-            // Считаем значение влажности
-            char* tmp = strstr(response_data, "\"state\":");
-            humi = strtol(tmp + 9, NULL, 10);
-            data.wifi = true;
-        } else {
-            ESP_LOGI(TAG, "NO INTERNET");
-        };
+    TickType_t prew = xTaskGetTickCount();
+    if (client) {
+        while (1) {
+            // Выполняем запрос
+            esp_err_t open_status = esp_http_client_open(client, 0);
+            ESP_LOGI(TAG, "OPEN %d", open_status);
+            int64_t fetch_header = esp_http_client_fetch_headers(client);
+            ESP_LOGI(TAG, "FETCH HEADERS %lld", fetch_header);
+            int response = esp_http_client_get_status_code(client);
+            ESP_LOGI(TAG, "STATUS CODE = %d", response);
+
+            if (response == 200 && open_status == 0) {
+                int response_len = esp_http_client_read(client, response_data, len_data);
+                ESP_LOGI(TAG, "LEN READ = %d", response_len);
+                ESP_LOGI(TAG, "response data = %s", response_data);
+                // Считаем значение влажности
+                char* tmp = strstr(response_data, "\"state\":");
+                humi = strtol(tmp + 9, NULL, 10);
+                data.wifi = true;
+                data.big_num = humi;
+                ESP_LOGI(TAG, "HUMIDITY = %d", humi);
+            } else {
+                ESP_LOGI(TAG, "NO INTERNET");
+                data.wifi = false;
+            };
+            esp_http_client_close(client);
+            vTaskDelayUntil(&prew, 10000 / portTICK_PERIOD_MS);
+        }
         // Освободим ресурсы
         esp_http_client_cleanup(client);
     }
-    return humi;
 }
 
 void initDisplay() {
