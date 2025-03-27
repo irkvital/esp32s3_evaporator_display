@@ -60,12 +60,12 @@ static void refreshData(void* arg) {
         data.water = rand() % 2;
         data.tasty = rand() % 2;
         data.ion = rand() % 2;
-        data.wifi = rand() % 2;
+        // data.wifi = rand() % 2;
         data.timer = rand() % 2;
         // gnd2
         data.small_num = rand() % 20;
         // gnd3
-        data.big_num = rand() % 100;
+        // data.big_num = rand() % 100;
         data.h = rand() % 2;
         // gnd4
         data.celsius = rand() % 2;
@@ -79,12 +79,10 @@ static void refreshData(void* arg) {
         data.auto_3 = (tmp > 2) ? true : false;
         data.auto_4 = (tmp > 3) ? true : false;
 
-        ESP_LOGI(TAG, "CHANGE DATA = %d", data.big_num);
+        ESP_LOGD(TAG, "CHANGE DATA = %d", data.big_num);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
-
-
 
 // входной параметр - цифра (от 0 до 9), на выходе 
 // структура с 7 сигналами для отрисовки цифры и двумя сигналами pin8 и pin9 в конце
@@ -175,6 +173,8 @@ static void refreshPinsData(){
 
 
 static void displayShows(int gnd_num, pinsData pins_data) {
+    // отключение всех gnd
+    offGndPins();
     // зануление gnd
     gpio_set_level(gnd_num, 0);
     // выставление напряжения на пинах
@@ -191,8 +191,6 @@ static void displayShows(int gnd_num, pinsData pins_data) {
     bool alarm;
     if(xQueueReceive(timer_queue, &alarm, 10)) {
     }
-    // отключение всех gnd
-        offGndPins();
 }
 
 
@@ -209,7 +207,6 @@ static void displayRefreshTask(void* arg) {
             displayShows(GND_5, pins_data_gnd5);
             displayShows(GND_6, pins_data_gnd6);
         }
-        ESP_LOGI(TAG, "refresh");
     }
 
     vTaskDelete(NULL);
@@ -257,6 +254,67 @@ void initTimer() {
     ESP_LOGI("main", "Hardware timer stated");
 }
 
+// HTTP запрос от home assistant
+static void refreshDataHumi(void* arg) {
+    char* url = "http://192.168.0.249:8123/api/states/sensor.qingping_cgs1_humidity";
+    // Параметры конфигурации HTTP-соединения
+    esp_http_client_config_t request;
+    memset(&request, 0, sizeof(request));
+    // Начальный URI
+    request.url = url;
+    // Транспорт TCP/IP
+    request.transport_type = HTTP_TRANSPORT_OVER_TCP;
+    // Запрос типа GET
+    request.method = HTTP_METHOD_GET;
+    // Блокировка задачи на время выполнения обмена с сервером
+    request.is_async = false;
+    // Закрыть соединение сразу после отправки всех данных
+    request.keep_alive_enable = false;
+    // Таймаут передачи
+    request.timeout_ms = 5000;
+    // Разрешить автоматическую переадресацию без ограничений
+    request.disable_auto_redirect = false;
+    request.max_redirection_count = 0;
+
+    esp_http_client_handle_t client = esp_http_client_init(&request);
+    esp_http_client_set_header(client, "Authorization", HOME_ASSISTANT_TOKEN);
+    int len_data = 500;
+    char response_data[len_data];
+    int humi = -1;
+
+    TickType_t prew = xTaskGetTickCount();
+    if (client) {
+        while (1) {
+            // Выполняем запрос
+            esp_err_t open_status = esp_http_client_open(client, 0);
+            ESP_LOGD(TAG, "OPEN %d", open_status);
+            int64_t fetch_header = esp_http_client_fetch_headers(client);
+            ESP_LOGD(TAG, "FETCH HEADERS %lld", fetch_header);
+            int response = esp_http_client_get_status_code(client);
+            ESP_LOGD(TAG, "STATUS CODE = %d", response);
+
+            if (response == 200 && open_status == 0) {
+                int response_len = esp_http_client_read(client, response_data, len_data);
+                ESP_LOGD(TAG, "LEN READ = %d", response_len);
+                ESP_LOGD(TAG, "response data = %s", response_data);
+                // Считаем значение влажности
+                char* tmp = strstr(response_data, "\"state\":");
+                humi = strtol(tmp + 9, NULL, 10);
+                data.wifi = true;
+                data.big_num = humi;
+                ESP_LOGD(TAG, "HUMIDITY = %d", humi);
+            } else {
+                ESP_LOGI(TAG, "NO INTERNET");
+                data.wifi = false;
+            };
+            esp_http_client_close(client);
+            vTaskDelayUntil(&prew, 10000 / portTICK_PERIOD_MS);
+        }
+        // Освободим ресурсы
+        esp_http_client_cleanup(client);
+    }
+}
+
 void initDisplay() {
     initGndPin(GND_1);
     initGndPin(GND_2);
@@ -278,7 +336,7 @@ void initDisplay() {
     refreshPinsData();
     initTimer();
 
-
     xTaskCreatePinnedToCore(displayRefreshTask, "refresh_display_task", 4096, NULL, 10, NULL, 1);
     xTaskCreatePinnedToCore(refreshData, "refreshData", 4096, NULL, 2, NULL, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(refreshDataHumi, "refreshDataHumi", 4096, NULL, 2, NULL, 1);
 }

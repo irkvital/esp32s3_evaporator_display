@@ -1,2 +1,3 @@
-idf_component_register(SRCS "rgb_led.c" "touch.c" "evaporator_display.c" "main.c" INCLUDE_DIRS ".")
-
+idf_component_register(EXTRA_COMPONENT_DIRS "../components/button_fix_bounce/"
+                    SRCS "main.c" "evaporator_display.c" "wifi.c"
+                    INCLUDE_DIRS ".")
