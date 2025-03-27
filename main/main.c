@@ -5,6 +5,6 @@ void app_main(void)
     initWifi();
     buttonFixInit();
     initDisplay();
-    touchTask();
+    // touchTask();
 }
     
