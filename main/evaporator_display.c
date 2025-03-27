@@ -287,22 +287,22 @@ static void refreshDataHumi(void* arg) {
         while (1) {
             // Выполняем запрос
             esp_err_t open_status = esp_http_client_open(client, 0);
-            ESP_LOGI(TAG, "OPEN %d", open_status);
+            ESP_LOGD(TAG, "OPEN %d", open_status);
             int64_t fetch_header = esp_http_client_fetch_headers(client);
-            ESP_LOGI(TAG, "FETCH HEADERS %lld", fetch_header);
+            ESP_LOGD(TAG, "FETCH HEADERS %lld", fetch_header);
             int response = esp_http_client_get_status_code(client);
-            ESP_LOGI(TAG, "STATUS CODE = %d", response);
+            ESP_LOGD(TAG, "STATUS CODE = %d", response);
 
             if (response == 200 && open_status == 0) {
                 int response_len = esp_http_client_read(client, response_data, len_data);
-                ESP_LOGI(TAG, "LEN READ = %d", response_len);
-                ESP_LOGI(TAG, "response data = %s", response_data);
+                ESP_LOGD(TAG, "LEN READ = %d", response_len);
+                ESP_LOGD(TAG, "response data = %s", response_data);
                 // Считаем значение влажности
                 char* tmp = strstr(response_data, "\"state\":");
                 humi = strtol(tmp + 9, NULL, 10);
                 data.wifi = true;
                 data.big_num = humi;
-                ESP_LOGI(TAG, "HUMIDITY = %d", humi);
+                ESP_LOGD(TAG, "HUMIDITY = %d", humi);
             } else {
                 ESP_LOGI(TAG, "NO INTERNET");
                 data.wifi = false;

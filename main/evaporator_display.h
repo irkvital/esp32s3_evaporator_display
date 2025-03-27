@@ -9,22 +9,22 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 
-#define GND_1 GPIO_NUM_13
-#define GND_2 GPIO_NUM_12
-#define GND_3 GPIO_NUM_11
-#define GND_4 GPIO_NUM_10
-#define GND_5 GPIO_NUM_9
-#define GND_6 GPIO_NUM_4
+#define GND_1 GPIO_NUM_4
+#define GND_2 GPIO_NUM_5
+#define GND_3 GPIO_NUM_6
+#define GND_4 GPIO_NUM_7
+#define GND_5 GPIO_NUM_15
+#define GND_6 GPIO_NUM_16
 
-#define DISP_1 GPIO_NUM_3
-#define DISP_2 GPIO_NUM_8
-#define DISP_3 GPIO_NUM_18
-#define DISP_4 GPIO_NUM_17
-#define DISP_5 GPIO_NUM_16
-#define DISP_6 GPIO_NUM_15
-#define DISP_7 GPIO_NUM_7
-#define DISP_8 GPIO_NUM_6
-#define DISP_9 GPIO_NUM_5
+#define DISP_1 GPIO_NUM_17
+#define DISP_2 GPIO_NUM_18
+#define DISP_3 GPIO_NUM_8
+#define DISP_4 GPIO_NUM_3
+#define DISP_5 GPIO_NUM_46
+#define DISP_6 GPIO_NUM_9
+#define DISP_7 GPIO_NUM_10
+#define DISP_8 GPIO_NUM_11
+#define DISP_9 GPIO_NUM_12
 
 #define BEARER "Bearer "
 #define HOME_ASSISTANT_TOKEN BEARER CONFIG_HOME_ASSISTANT_TOKEN
